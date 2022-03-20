@@ -41,8 +41,8 @@ typedef struct task {
 } task;
 
 
-static task task1, task2, task3, task4, task5/*, task6, Move_Magnetic_Droplet, Move_Clear_Droplet*/;
-task *tasks[] = { &task1, &task2, &task3, &task4, &task5, /*&task6, &Move_Magnetic_Droplet, &Move_Clear_Droplet*/};
+static task task1, task2, task3, task4, task5/*, task6*/ /*, Move_Magnetic_Droplet, Move_Clear_Droplet*/, Magnetic_Droplet_Movement_C3, Clear_Droplet_Movement_C3;
+task *tasks[] = { &task1, &task2, &task3, &task4, &task5/*, &task6*/ /*, &Move_Magnetic_Droplet, &Move_Clear_Droplet*/, &Magnetic_Droplet_Movement_C3, &Clear_Droplet_Movement_C3};
 const unsigned short numTasks = sizeof(tasks)/sizeof(task*);
 
 const char start = -1;
@@ -70,7 +70,7 @@ bool idle = true;
 
 bool Magnet1_state = false;
 bool Magnet2_state = false;
-
+/*
 //local variables - Complexity 1
 bool moved = false;
 //shared variables - Complexity 1
@@ -94,7 +94,7 @@ int cnt = 0;
 bool m_mag = false;
 
 //task: Move_Clear_Droplet
-vector<string> cl_directions = {"left", "left", "left", "left", "left", "left", "left", "left", "left", "down", "down", "right", "right"};
+vector<string> cl_directions = {"left", "left", "left", "left", "left", "left", "left", "left", "down", "down", "right", "right"};
 int cl_index = 0;
 bool magnet_lowered = false;
 int cl_x_pos;
@@ -105,7 +105,32 @@ bool cl_done = false;
 
 //shared variables - Complexity 2
 bool done;
+*/
 
+//shared variables - Complexity 3
+bool A_done = false;
+
+//local variables - Complexity 3
+//task: Magnetic_Droplet_Movement_C3
+vector<string> A_directions = {"right", "right", "right", "right", "down", "down", "down", "left"};
+int A_index = 0;
+bool A_magnet_raised = false;
+int A_x_pos;
+int A_y_pos;
+bool A_at_mag = false;
+int c3 = 0;
+
+//task: Clear_Droplet_Movement_C3
+vector<string> cl3_directions = {"left", "left", "left", "left", "left", "left", "left", "left", "down", "right", "right", "right", "down", "down"};
+int B_index = 0;
+bool B_magnet_lowered = false;
+int B_x_pos;
+int B_y_pos;
+int cnt3 = 0;
+bool over_mag = false;
+bool over_heat = false;
+bool heating_done = false;
+bool B_done = false;
 
 // 2. serial communication
 enum Comm_States { SC_Init };
@@ -378,20 +403,20 @@ int TickFct_Joystick(int state) {
 
             state = NJ_Init;
             
-            if(joystick_moved){
-              //OpenDropDevice.read_Fluxels();
-              //byte* fluxel_array = OpenDropDevice.get_pad_feedback_array();
-              Serial.print("fluxel_array: [");
-              for(int i = 0; i < 128; i++){
-                //Serial.print(fluxel_array[i]); //or *(fluxel_array + i)
-                byte feedback_val = OpenDropDevice.pad_feedback[i];
-                Serial.print(feedback_val);
-                Serial.print(", ");
-              }
-              Serial.print("]");
-              Serial.println();
-              joystick_moved = false;
-            }
+//            if(joystick_moved){
+//              //OpenDropDevice.read_Fluxels();
+//              //byte* fluxel_array = OpenDropDevice.get_pad_feedback_array();
+//              Serial.print("fluxel_array: [");
+//              for(int i = 0; i < 128; i++){
+//                //Serial.print(fluxel_array[i]); //or *(fluxel_array + i)
+//                byte feedback_val = OpenDropDevice.pad_feedback[i];
+//                Serial.print(feedback_val);
+//                Serial.print(", ");
+//              }
+//              Serial.print("]");
+//              Serial.println();
+//              joystick_moved = false;
+//            }
             
             break;
 
@@ -411,6 +436,211 @@ int TickFct_Joystick(int state) {
     return state;
 }
 
+//Complexity 3
+enum MagneticDroplet_C3_States {MD3_Start, MD3_Init, MD3_Move_A_Droplet, MD3_Raise_Magnet, MD3_Stop_A};
+int TickFct_MagneticDropletMovement_C3(int state){
+  switch(state){ //transitions
+    case MD3_Start:
+      state = MD3_Init;
+      break;
+    case MD3_Init:
+      state = MD3_Move_A_Droplet;
+      break;
+    case MD3_Move_A_Droplet:
+      if(A_done){
+        state = MD3_Stop_A;
+        break;  
+      }
+      if(A_at_mag){
+        c3 = 0;
+        state = MD3_Raise_Magnet;
+      }
+      break;
+    case MD3_Raise_Magnet:
+      if(c3 > 3){
+        A_at_mag = false;
+        state = MD3_Move_A_Droplet;
+      }
+      break;
+    case MD3_Stop_A:
+      break;
+  }  
+  switch(state){ //actions
+    case MD3_Start:
+      break;
+    case MD3_Init:
+      myDrop->begin(1, 1);
+      OpenDropDevice.update();
+      A_index = 0;
+      A_magnet_raised = false;
+      A_x_pos = 1;
+      A_y_pos = 1;
+      A_at_mag = false;
+      c3 = 0;
+      break;
+    case MD3_Move_A_Droplet:
+      if(!A_magnet_raised && (A_x_pos == 5) && (A_y_pos == 2)){
+        A_at_mag = true;
+        break;
+      }
+      if(A_index < A_directions.size()){
+        if((A_directions.at(A_index) == "up") && (A_y_pos > 0)){
+          A_y_pos -= 1;
+          myDrop->move_up();
+          OpenDropDevice.update_Drops();
+          OpenDropDevice.update();
+        }
+        if((A_directions.at(A_index) == "down") && (A_y_pos < 7)){
+          A_y_pos += 1;
+          myDrop->move_down();
+          OpenDropDevice.update_Drops();
+          OpenDropDevice.update();
+        }
+        if((A_directions.at(A_index) == "left") && (A_x_pos > 1)){
+          A_x_pos -= 1;
+          myDrop->move_left();
+          OpenDropDevice.update_Drops();
+          OpenDropDevice.update();
+        }
+        if((A_directions.at(A_index) == "right") && (A_x_pos < 14)){
+          A_x_pos += 1;
+          myDrop->move_right();
+          OpenDropDevice.update_Drops();
+          OpenDropDevice.update();
+        }
+        A_index++;
+      }
+      if(A_index >= A_directions.size()){
+        A_done = true;
+      }
+      break;
+    case MD3_Raise_Magnet:
+      c3++;
+      //OpenDropDevice.set_Magnet(1, true);
+      A_magnet_raised = true;
+      break;
+    case MD3_Stop_A:
+      break;
+  }
+  return state;
+}
+
+//Complexity 3
+enum ClearDroplet_C3_States {CL3_Start, CL3_Init, CL3_Move_B_Droplet, CL3_Lower_Magnet, CL3_Activate_Heating_Region, CL3_Stop};
+int TickFct_ClearDropletMovement_C3(int state){
+  switch(state){ //transitions
+    case CL3_Start:
+      if(A_done){
+        state = CL3_Init;  
+      }
+      break;
+    case CL3_Init:
+      state = CL3_Move_B_Droplet;
+      break;
+    case CL3_Move_B_Droplet:
+      if(B_done){
+        state = CL3_Stop;
+        break;
+      }
+      if(over_mag){
+        cnt3 = 0;
+        state = CL3_Lower_Magnet;
+      }
+      if(over_heat){
+        cnt3 = 0;
+        state = CL3_Activate_Heating_Region;
+      }
+      break;
+    case CL3_Lower_Magnet:
+      if(cnt3 > 3){
+        over_mag = false;
+        state = CL3_Move_B_Droplet;
+      }
+      break;
+    case CL3_Activate_Heating_Region:
+      if(cnt3 > 5){
+        over_heat = false;
+        //deactivate heating region
+        state = CL3_Move_B_Droplet;
+      }
+      break;
+    case CL3_Stop:
+      break;
+  }
+  
+  switch(state){ //actions
+    case CL3_Start:
+      break;
+    case CL3_Init:
+      myDrop->begin(13, 1);
+      OpenDropDevice.update();
+      B_index = 0;
+      B_magnet_lowered = false;
+      B_x_pos = 13;
+      B_y_pos = 1;
+      cnt3 = 0;
+      over_mag = false;
+      over_heat = false;
+      heating_done = false;
+      B_done = false;
+      break;
+    case CL3_Move_B_Droplet:
+      if(!B_magnet_lowered && (B_x_pos == 5) && (B_y_pos == 2)){
+        over_mag = true;
+        break;
+      }
+      if(!heating_done && (B_x_pos == 7) && (B_y_pos == 2)){
+        over_heat = true;
+        break;
+      }
+      if(B_index < cl3_directions.size()){
+        if((cl3_directions.at(B_index) == "up") && (B_y_pos > 0)){
+          B_y_pos -= 1;
+          myDrop->move_up();
+          OpenDropDevice.update_Drops();
+          OpenDropDevice.update();
+        }
+        if((cl3_directions.at(B_index) == "down") && (B_y_pos < 7)){
+          B_y_pos += 1;
+          myDrop->move_down();
+          OpenDropDevice.update_Drops();
+          OpenDropDevice.update();
+        }
+        if((cl3_directions.at(B_index) == "left") && (B_x_pos > 1)){
+          B_x_pos -= 1;
+          myDrop->move_left();
+          OpenDropDevice.update_Drops();
+          OpenDropDevice.update();
+        }
+        if((cl3_directions.at(B_index) == "right") && (B_x_pos < 14)){
+          B_x_pos += 1;
+          myDrop->move_right();
+          OpenDropDevice.update_Drops();
+          OpenDropDevice.update();
+        }
+        B_index++;
+      }
+      if(B_index >= cl3_directions.size()){
+        B_done = true;
+      }
+      break;
+    case CL3_Lower_Magnet:
+      cnt3++;
+      //OpenDropDevice.set_Magnet(1, true);
+      B_magnet_lowered = true;
+      break;
+    case CL3_Activate_Heating_Region:
+      cnt3++;
+      //activate heating region
+      heating_done = true;
+      break;
+    case CL3_Stop:
+      break;
+  }
+
+  return state;
+}
+/*
 //Complexity 2
 enum MagneticDroplet_States {MD_Start, Init, Move_m_Droplet, Raise_Magnet, MD_Stop};
 int TickFct_MagneticDropletMovement(int state){
@@ -501,7 +731,7 @@ int TickFct_MagneticDropletMovement(int state){
     case MD_Stop:
       break;
   }
-
+  
   return state;
 }
 
@@ -543,9 +773,9 @@ int TickFct_ClearDropletMovement(int state){
     case CD_Start:
       break;
     case CD_Init:
-      myDrop->begin(14, 1);
+      myDrop->begin(13, 1);
       OpenDropDevice.update();
-      cl_x_pos = 14;
+      cl_x_pos = 13;
       cl_y_pos = 1;
       cl_mag = false;
       cl_index = 0;
@@ -600,7 +830,9 @@ int TickFct_ClearDropletMovement(int state){
 
   return state;
 }
+*/
 
+/*
 //Complexity 1
 enum Pre_Defined_Drop_Movement_States {M_Start, Initial, Pos1_1, Pos2_1, Pos3_1, Pos3_2, Pos3_3, Pos2_3, Pos1_3, Pos1_2};
 int TickFct_DropMovement(int state){
@@ -779,7 +1011,7 @@ int TickFct_DropMovement(int state){
   }
   return state;
 }
-
+*/
 
 
 // 1. setup loop
@@ -814,18 +1046,29 @@ void setup() {
     task6.period = 10000;
     task6.elapsedTime = 0;
     task6.TickFct = &TickFct_DropMovement;
-    
+    */
 
+    /*
     Move_Magnetic_Droplet.state = MD_Start;
     Move_Magnetic_Droplet.period = 10000;
     Move_Magnetic_Droplet.elapsedTime = Move_Magnetic_Droplet.period;
     Move_Magnetic_Droplet.TickFct = &TickFct_MagneticDropletMovement;
 
     Move_Clear_Droplet.state = CD_Start;
-    Move_Clear_Droplet.period = 10000;
+    Move_Clear_Droplet.period = 20000;
     Move_Clear_Droplet.elapsedTime = Move_Clear_Droplet.period;
     Move_Clear_Droplet.TickFct = &TickFct_ClearDropletMovement;
     */
+
+    Magnetic_Droplet_Movement_C3.state = MD3_Start;
+    Magnetic_Droplet_Movement_C3.period = 10000;
+    Magnetic_Droplet_Movement_C3.elapsedTime = Magnetic_Droplet_Movement_C3.period;
+    Magnetic_Droplet_Movement_C3.TickFct = &TickFct_MagneticDropletMovement_C3;
+    
+    Clear_Droplet_Movement_C3.state = CL3_Start;
+    Clear_Droplet_Movement_C3.period = 10000;
+    Clear_Droplet_Movement_C3.elapsedTime = Clear_Droplet_Movement_C3.period;
+    Clear_Droplet_Movement_C3.TickFct = &TickFct_ClearDropletMovement_C3;
     
     for(i = 1; i < numTasks; i++) {
         GCD = findGCD(GCD, tasks[i]->period);
