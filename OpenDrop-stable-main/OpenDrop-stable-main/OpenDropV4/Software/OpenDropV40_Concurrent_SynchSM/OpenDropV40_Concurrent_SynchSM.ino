@@ -41,8 +41,8 @@ typedef struct task {
 } task;
 
 
-static task task1, task2, task3, task4, task5, /*task6,*/ Move_Magnetic_Droplet, Move_Clear_Droplet;
-task *tasks[] = { &task1, &task2, &task3, &task4, &task5, /*&task6,*/ &Move_Magnetic_Droplet, &Move_Clear_Droplet};
+static task task1, task2, task3, task4, task5/*, task6, Move_Magnetic_Droplet, Move_Clear_Droplet*/;
+task *tasks[] = { &task1, &task2, &task3, &task4, &task5, /*&task6, &Move_Magnetic_Droplet, &Move_Clear_Droplet*/};
 const unsigned short numTasks = sizeof(tasks)/sizeof(task*);
 
 const char start = -1;
@@ -814,7 +814,7 @@ void setup() {
     task6.period = 10000;
     task6.elapsedTime = 0;
     task6.TickFct = &TickFct_DropMovement;
-    */
+    
 
     Move_Magnetic_Droplet.state = MD_Start;
     Move_Magnetic_Droplet.period = 10000;
@@ -825,7 +825,7 @@ void setup() {
     Move_Clear_Droplet.period = 10000;
     Move_Clear_Droplet.elapsedTime = Move_Clear_Droplet.period;
     Move_Clear_Droplet.TickFct = &TickFct_ClearDropletMovement;
-    
+    */
     
     for(i = 1; i < numTasks; i++) {
         GCD = findGCD(GCD, tasks[i]->period);
