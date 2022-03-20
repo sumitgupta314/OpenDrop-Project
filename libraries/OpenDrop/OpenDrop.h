@@ -17,10 +17,7 @@
 #define max_drops   8          
 
 
-
-
 class OpenDrop;
-
 
 class Drop {
 
@@ -64,6 +61,7 @@ bool _moving;
 class OpenDrop
 {
  public:
+  byte pad_feedback [128];
   OpenDrop(uint8_t addr = 0x60);
   friend class Drop;
   void begin(uint16_t freq = 1600);
@@ -80,6 +78,8 @@ class OpenDrop
   void show_joy(boolean val);
   void set_voltage(uint16_t voltage, bool AC_on,uint16_t frequence);
   void setPin(uint8_t pin, boolean val);
+  byte* get_pad_feedback_array();
+  byte get_pad_feedback_at(int index);
   Drop *getDrop();
 
 

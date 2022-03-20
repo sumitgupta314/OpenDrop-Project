@@ -41,8 +41,8 @@ typedef struct task {
 } task;
 
 
-static task task1, task2, task3, task4, task5/*, task6*/ /*, Move_Magnetic_Droplet, Move_Clear_Droplet*/, Magnetic_Droplet_Movement_C3, Clear_Droplet_Movement_C3;
-task *tasks[] = { &task1, &task2, &task3, &task4, &task5/*, &task6*/ /*, &Move_Magnetic_Droplet, &Move_Clear_Droplet*/, &Magnetic_Droplet_Movement_C3, &Clear_Droplet_Movement_C3};
+static task task1, task2, task3, task4, task5, task6, Drop_Feedback_Sensing, Drop_Error_Correction /*, Move_Magnetic_Droplet, Move_Clear_Droplet, Magnetic_Droplet_Movement_C3, Clear_Droplet_Movement_C3*/;
+task *tasks[] = { &task1, &task2, &task3, &task4, &task5, &task6, &Drop_Feedback_Sensing, &Drop_Error_Correction /*, &Move_Magnetic_Droplet, &Move_Clear_Droplet, &Magnetic_Droplet_Movement_C3, &Clear_Droplet_Movement_C3*/};
 const unsigned short numTasks = sizeof(tasks)/sizeof(task*);
 
 const char start = -1;
@@ -70,18 +70,28 @@ bool idle = true;
 
 bool Magnet1_state = false;
 bool Magnet2_state = false;
-/*
-//local variables - Complexity 1
-bool moved = false;
+
+
+
 //shared variables - Complexity 1
 int expected_x_pos;
 int expected_y_pos;
 int actual_x_pos;
 int actual_y_pos;
 bool continue_movement = true;
+//local variables - Complexity 1
+//task: Pre_defined_Drop_Movement (task6)
+bool moved = false;
+
+//task: Drop_Feedback_Sensing
+//no local variables
+
+//task: Drop_Error_Correction
+bool x_alligned = true;
+bool y_alligned = true;
 
 int j = 0;
-
+/*
 //local variables - Complexity 2
 //task: Move_Magnetic_Droplet
 bool m_moved = false;
@@ -107,6 +117,7 @@ bool cl_done = false;
 bool done;
 */
 
+/*
 //shared variables - Complexity 3
 bool A_done = false;
 
@@ -131,6 +142,7 @@ bool over_mag = false;
 bool over_heat = false;
 bool heating_done = false;
 bool B_done = false;
+*/
 
 // 2. serial communication
 enum Comm_States { SC_Init };
@@ -436,6 +448,7 @@ int TickFct_Joystick(int state) {
     return state;
 }
 
+/*
 //Complexity 3
 enum MagneticDroplet_C3_States {MD3_Start, MD3_Init, MD3_Move_A_Droplet, MD3_Raise_Magnet, MD3_Stop_A};
 int TickFct_MagneticDropletMovement_C3(int state){
@@ -640,6 +653,8 @@ int TickFct_ClearDropletMovement_C3(int state){
 
   return state;
 }
+*/
+
 /*
 //Complexity 2
 enum MagneticDroplet_States {MD_Start, Init, Move_m_Droplet, Raise_Magnet, MD_Stop};
@@ -832,7 +847,7 @@ int TickFct_ClearDropletMovement(int state){
 }
 */
 
-/*
+
 //Complexity 1
 enum Pre_Defined_Drop_Movement_States {M_Start, Initial, Pos1_1, Pos2_1, Pos3_1, Pos3_2, Pos3_3, Pos2_3, Pos1_3, Pos1_2};
 int TickFct_DropMovement(int state){
@@ -1011,8 +1026,94 @@ int TickFct_DropMovement(int state){
   }
   return state;
 }
-*/
 
+//Complexity 1
+enum Drop_Feedback_Sensing_States {DF_Start, DF_GetDropPosition};
+int TickFct_Drop_Feedback_Sensing(int state){
+  switch(state){
+    case DF_Start:
+      state = DF_GetDropPosition;
+      break;
+    case DF_GetDropPosition:
+      state = DF_GetDropPosition;
+      break;
+    
+  }
+  switch(state){
+    case DF_Start:
+      break;
+    case DF_GetDropPosition:
+      //problems with read_Fluxels() function in OpenDrop library to get actual capacitative drop position reading, 
+      //so this code below is just to make sure the Drop_Error_Correction task works well.
+      actual_x_pos = expected_x_pos;
+      actual_y_pos = expected_y_pos;
+      break;
+  }
+  return state;  
+}
+
+bool positions_alligned(){
+  if((expected_x_pos == actual_x_pos) && (expected_y_pos == actual_y_pos)){
+    return true;  
+  }else{
+    return false;
+  }
+}
+
+enum Drop_Error_Correction_States {DE_Start, No_Correction_Needed, Correction_Needed};
+int TickFct_Drop_Error_Correction(int state){
+  switch(state){
+    case DE_Start:
+      state = No_Correction_Needed;
+      break;
+    case No_Correction_Needed:
+      if(!positions_alligned()){
+        myDrop->begin(actual_x_pos, actual_y_pos);
+        state = Correction_Needed;
+      }
+      break;
+    case Correction_Needed:
+      if(positions_alligned()){
+        state = No_Correction_Needed;
+      }
+      break;
+  }
+  switch(state){
+    case DE_Start:
+      break;
+    case No_Correction_Needed:
+      continue_movement = true;
+      break;
+    case Correction_Needed:
+      continue_movement = false;
+      OpenDropDevice.update();
+      OpenDropDevice.update_Display();
+      if(actual_x_pos != expected_x_pos){
+        x_alligned = false;
+      }
+      if(actual_y_pos != expected_y_pos){
+        y_alligned = false;
+      }
+      if(!x_alligned){
+        if(expected_x_pos > actual_x_pos){
+          myDrop->move_right();
+        }
+        if(expected_x_pos < actual_x_pos){
+          myDrop->move_left();
+        }
+      }
+      if(x_alligned && !y_alligned){
+        if(expected_y_pos > actual_y_pos){
+          myDrop->move_up();
+        }
+        if(expected_x_pos < actual_x_pos){
+          myDrop->move_down();
+        }
+      }
+      break;    
+  }
+  return state;  
+}
 
 // 1. setup loop
 // the setup function runs once when you press reset or power the board
@@ -1041,12 +1142,22 @@ void setup() {
     task5.period = 1;                   // period of 1 ms
     task5.elapsedTime = task5.period;
     task5.TickFct = &TickFct_Joystick;
-    /*
+
+    //Complexity 1
     task6.state = M_Start;
     task6.period = 10000;
     task6.elapsedTime = 0;
     task6.TickFct = &TickFct_DropMovement;
-    */
+
+    Drop_Feedback_Sensing.state = DF_Start;
+    Drop_Feedback_Sensing.period = 50;
+    Drop_Feedback_Sensing.elapsedTime = Drop_Feedback_Sensing.period;
+    Drop_Feedback_Sensing.TickFct = &TickFct_Drop_Feedback_Sensing;
+
+    Drop_Error_Correction.state = DE_Start;
+    Drop_Error_Correction.period = 500;
+    Drop_Error_Correction.elapsedTime = Drop_Error_Correction.period;
+    Drop_Error_Correction.TickFct = &TickFct_Drop_Error_Correction;
 
     /*
     Move_Magnetic_Droplet.state = MD_Start;
@@ -1060,6 +1171,7 @@ void setup() {
     Move_Clear_Droplet.TickFct = &TickFct_ClearDropletMovement;
     */
 
+    /*
     Magnetic_Droplet_Movement_C3.state = MD3_Start;
     Magnetic_Droplet_Movement_C3.period = 10000;
     Magnetic_Droplet_Movement_C3.elapsedTime = Magnetic_Droplet_Movement_C3.period;
@@ -1069,7 +1181,7 @@ void setup() {
     Clear_Droplet_Movement_C3.period = 10000;
     Clear_Droplet_Movement_C3.elapsedTime = Clear_Droplet_Movement_C3.period;
     Clear_Droplet_Movement_C3.TickFct = &TickFct_ClearDropletMovement_C3;
-    
+    */
     for(i = 1; i < numTasks; i++) {
         GCD = findGCD(GCD, tasks[i]->period);
     }

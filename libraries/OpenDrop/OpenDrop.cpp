@@ -14,7 +14,7 @@
 
 
   bool Fluxls[FluxlPad_width][FluxlPad_heigth];
-  byte pad_feedback [128];
+  //static byte pad_feedback [128];
 
 uint32_t AC_frequency=1000; // Frequency in Hz
 uint16_t Voltage_set=240; // Voltage in Volt
@@ -100,8 +100,8 @@ void pinStr( uint32_t ulPin, unsigned strength) // works like pinMode(), but to 
 //Reset TC4 
 
 //Function that is used to check if TC4 is done syncing
-//returns true when it is done syncing
 bool tcIsSyncing()
+//returns true when it is done syncing
 {
   return TC4->COUNT16.STATUS.reg & TC_STATUS_SYNCBUSY;
 }
@@ -227,12 +227,12 @@ void clear_Fluxels()
 
 };
 
-
+/*
 bool free_Fluxel(uint8_t  x,uint8_t  y,uint8_t  dir)
 {bool check=true;
 
 
-if (check&&(x>0)&&(dir==4)) check = pad_feedback[pgm_read_byte_near(&FluxelID[x-1][y])]==1; //links
+if (check&&(x>0)&&(dir==4)) check = this->pad_feedback[pgm_read_byte_near(&FluxelID[x-1][y])]==1; //links
 if (check&&(x<(FluxlPad_width-1))&&(dir==2)) check = pad_feedback[pgm_read_byte_near(&FluxelID[x+1][y])]==1; //rechts
 if (check&&(y>0)&&(dir==1)) check = pad_feedback[pgm_read_byte_near(&FluxelID[x][y-1])]==1; // oben
 if (check&&(y<(FluxlPad_heigth-1))&&(dir==3)) check = pad_feedback[pgm_read_byte_near(&FluxelID[x][y+1])]==1; //unten
@@ -244,7 +244,7 @@ if (check&&(x<(FluxlPad_width-1))&&(y<(FluxlPad_heigth-1))&&((dir==2)||(dir==3))
 
 return check;
 };
-
+*/
 
 
 
@@ -649,7 +649,16 @@ this->update_Display();
  if(sound)    {OpenDropAudio.playMe(3);}
 
 }
+/*
+byte* get_pad_feedback_array(){
+	return pad_feedback;
+}
 
+byte get_pad_feedback_at(int index){
+	byte value = pad_feedback[index];
+	return value;
+}
+*/
 void OpenDrop::dispense(int reservoir, int delay_us) 
 {
 
@@ -790,7 +799,7 @@ this->update();
 
 };
 
-
+/*
 bool OpenDrop::run(void) {
 bool transition=false;
 this->read_Fluxels();
@@ -828,23 +837,23 @@ if (right) d1=pow((drops[i].position_x()+1)-(drops[i].goal_x()),2)+pow((drops[i]
 
 if (left) {d2=pow((drops[i].position_x()-1)-(drops[i].goal_x()),2)+pow((drops[i].position_y())-(drops[i].goal_y()),2); if (d2<d1) {right=false;d1=d2;} else left=false;};
 
-/*
-if (up) Serial.println("up");
-if (down) Serial.println("down");
-if (left) Serial.println("left");
-if (right) Serial.println("rigth");
-*/
+	/*
+	if (up) Serial.println("up");
+	if (down) Serial.println("down");
+	if (left) Serial.println("left");
+	if (right) Serial.println("rigth");
+	
 
 if (up) {d2=pow((drops[i].position_x())-(drops[i].goal_x()),2)+pow((drops[i].position_y()-1)-(drops[i].goal_y()),2); if (d2<d1) {left=false;right=false;d1=d2;} else up=false;}
 
 if (down) {d2=pow((drops[i].position_x())-(drops[i].goal_x()),2)+pow((drops[i].position_y()+1)-(drops[i].goal_y()),2); if (d2<d1) {left=false;up=false;right=false;d1=d2;} else down=false;}
 
-/*
-Serial.println("pow");
-Serial.println(d1);
-Serial.println(drops[i].position_x());
-Serial.println(drops[i].position_y());
-*/
+	/*
+	Serial.println("pow");
+	Serial.println(d1);
+	Serial.println(drops[i].position_x());
+	Serial.println(drops[i].position_y());
+	
 
 
 
@@ -863,7 +872,7 @@ this->update();
 
 return transition;
 };
-
+*/
 
 Drop *OpenDrop::getDrop() {
 uint8_t num=this->drop_count;
